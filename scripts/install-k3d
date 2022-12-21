@@ -1,0 +1,6 @@
+#!/bin/sh
+curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+k3d cluster create mycluster
+kubectl get nodes
+kubectl create ns capitolis
+curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh | bash

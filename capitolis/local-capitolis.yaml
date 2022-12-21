@@ -1,0 +1,131 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecr-registry-helper-cm
+  namespace: capitolis
+data:
+  AWS_REGION: "eu-west-1"
+  DOCKER_SECRET_NAME: capitolis-ecr-access
+  AWS_ACCOUNT: "607827849963"
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: ecr-registry-helper
+  namespace: capitolis
+spec:
+  schedule: "0 */10 * * *"
+  successfulJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: sa-capitolis-local
+          volumes:
+            - name: config-volume
+              configMap:
+                name: aws-mfa
+          containers:
+            - name: ecr-registry-helper
+              image: odaniait/aws-kubectl:latest
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+              - name: config-volume
+                mountPath: /app/MFA_credentials
+                subPath: MFA_credentials
+              envFrom:
+                - configMapRef:
+                    name: ecr-registry-helper-cm
+
+              command:
+                - /bin/sh
+                - -c
+                - |-
+                  source /app/MFA_credentials
+                  ECR_TOKEN=`aws ecr get-login-password --region eu-west-1`
+                  NAMESPACE_NAME=capitolis
+                  kubectl delete secret --ignore-not-found capitolis-ecr-access -n capitolis
+                  kubectl create secret docker-registry capitolis-ecr-access \
+                  --docker-server=https://${AWS_ACCOUNT}.dkr.ecr.eu-west-1.amazonaws.com \
+                  --docker-username=AWS \
+                  --docker-password="${ECR_TOKEN}" \
+                  --namespace=capitolis
+                  echo "Secret was successfully updated at $(date)"
+          restartPolicy: Never
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sa-capitolis-local
+  namespace: capitolis
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: capitolis
+  name: role-full-access-to-secrets
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["capitolis-ecr-access"]
+    verbs: ["delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capitolis-local-role-binding
+  namespace: capitolis
+subjects:
+  - kind: ServiceAccount
+    name: sa-capitolis-local
+    namespace: capitolis
+    apiGroup: ""
+roleRef:
+  kind: Role
+  name: role-full-access-to-secrets
+  apiGroup: ""
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cap-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: “/tmp/k3dvol”
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cap-pv-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: capitolis-secrets
+  namespace: capitolis
+type: Opaque
+data:
+  GRAPHQL_DB_PASSWORD: bVE5bjFjN25LMktWakQ=
+  GRAPHQL_DB_USER: Y2FwbWFya2V0MQ==
+  POSTGRES_PASS: bVE5bjFjN25LMktWakQ=
+  POSTGRES_USER: Y2FwbWFya2V0MQ==
