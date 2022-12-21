@@ -3,17 +3,17 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ecr-registry-helper-cm
-  namespace: capitolis
+  namespace: assets
 data:
   AWS_REGION: "eu-west-1"
-  DOCKER_SECRET_NAME: capitolis-ecr-access
+  DOCKER_SECRET_NAME: assets-ecr-access
   AWS_ACCOUNT: "607827849963"
 ---
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
   name: ecr-registry-helper
-  namespace: capitolis
+  namespace: assets
 spec:
   schedule: "0 */10 * * *"
   successfulJobsHistoryLimit: 3
@@ -22,7 +22,7 @@ spec:
     spec:
       template:
         spec:
-          serviceAccountName: sa-capitolis-local
+          serviceAccountName: sa-assets-local
           volumes:
             - name: config-volume
               configMap:
@@ -60,17 +60,17 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: sa-capitolis-local
-  namespace: capitolis
+  namespace: assets
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: capitolis
+  namespace: assets
   name: role-full-access-to-secrets
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: ["capitolis-ecr-access"]
+    resourceNames: ["assets-ecr-access"]
     verbs: ["delete"]
   - apiGroups: [""]
     resources: ["secrets"]
@@ -80,11 +80,11 @@ kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: capitolis-local-role-binding
-  namespace: capitolis
+  namespace: assets
 subjects:
   - kind: ServiceAccount
-    name: sa-capitolis-local
-    namespace: capitolis
+    name: sa-assets-local
+    namespace: assets
     apiGroup: ""
 roleRef:
   kind: Role
@@ -122,7 +122,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: capitolis-secrets
-  namespace: capitolis
+  namespace: assets
 type: Opaque
 data:
   GRAPHQL_DB_PASSWORD: bVE5bjFjN25LMktWakQ=
