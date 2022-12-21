@@ -1,5 +1,5 @@
 install-k3d:
-
+		scripts/install-k3d.sh
 pre-local-env:
 		scripts/pre.sh
 
